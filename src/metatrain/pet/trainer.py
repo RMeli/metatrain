@@ -164,7 +164,7 @@ class Trainer(TrainerInterface):
                     num_replicas=world_size,
                     rank=rank,
                     shuffle=True,
-                    drop_last=len(train_dataset) > self.hypers["batch_size"],
+                    drop_last=True,
                 )
                 for train_dataset in train_datasets
             ]
@@ -184,22 +184,18 @@ class Trainer(TrainerInterface):
 
         # Create dataloader for the training datasets:
         train_dataloaders = []
-        for train_dataset, train_sampler in zip(train_datasets, train_samplers):
+        for dataset, sampler in zip(train_datasets, train_samplers):
             train_dataloaders.append(
                 DataLoader(
                     dataset=dataset,
                     batch_size=self.hypers["batch_size"],
-                    sampler=train_sampler,
+                    sampler=sampler,
                     shuffle=(
-                        # the sampler takes care of this (if present)
-                        train_sampler is None
-                    ),
+                        sampler is None
+                    ),  # the sampler takes care of this (if present)
                     drop_last=(
-                        # the sampler takes care of this (if present)
-                        # check if batch size > train_dataset
-                        len(train_dataset) > self.hypers["batch_size"]
-                        and train_sampler is None
-                    ),
+                        sampler is None
+                    ),  # the sampler takes care of this (if present)
                     collate_fn=collate_fn,
                 )
             )
@@ -207,12 +203,12 @@ class Trainer(TrainerInterface):
 
         # Create dataloader for the validation datasets:
         val_dataloaders = []
-        for val_dataset, val_sampler in zip(val_datasets, val_samplers):
+        for dataset, sampler in zip(val_datasets, val_samplers):
             val_dataloaders.append(
                 DataLoader(
-                    dataset=val_dataset,
+                    dataset=dataset,
                     batch_size=self.hypers["batch_size"],
-                    sampler=val_sampler,
+                    sampler=sampler,
                     shuffle=False,
                     drop_last=False,
                     collate_fn=collate_fn,
@@ -294,8 +290,7 @@ class Trainer(TrainerInterface):
 
         for epoch in range(start_epoch, start_epoch + self.hypers["num_epochs"]):
             if is_distributed:
-                for train_sampler in train_samplers:
-                    train_sampler.set_epoch(epoch)
+                sampler.set_epoch(epoch)
             train_rmse_calculator = RMSEAccumulator(self.hypers["log_separate_blocks"])
             val_rmse_calculator = RMSEAccumulator(self.hypers["log_separate_blocks"])
             if self.hypers["log_mae"]:
